@@ -9,7 +9,7 @@ version = "0.1.2"
 
 [dependencies]
 anyhow = "1.0.80"
-clap = { version = "4.5.1", features = ["derive"] }
+clap = { version = "4.5.1" }
 num-bigint = { version = "0.4.4", features = ["serde"] }
 regex = "1.10.3"
 serde = { version = "1.0", features = ["derive"] }
@@ -17,3 +17,6 @@ serde_json = "1.0.114"
 starknet-crypto = "0.7.1"
 starknet-types-core = "0.1.5"
 thiserror = "1.0.61"
+cainome = { git = "https://github.com/cartridge-gg/cainome", branch = "feature/cairo-serde-derive-enums" }
+cainome-cairo-serde = { git = "https://github.com/cartridge-gg/cainome", branch = "feature/cairo-serde-derive-enums" }
+cainome-cairo-serde-derive = { git = "https://github.com/cartridge-gg/cainome", branch = "feature/cairo-serde-derive-enums" }
