@@ -16,7 +16,7 @@ pub const MAX_ADDRESS: Felt = Felt::from_hex_unchecked("0xffffffffffffffff");
 pub const INITIAL_PC: Felt = Felt::from_hex_unchecked("0x1");
 
 #[serde_as]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PublicInput {
     #[cfg_attr(
         feature = "std",
@@ -119,7 +119,7 @@ impl PublicInput {
         };
 
         if let Some(dynamic_params) = &self.dynamic_params {
-            let dynamic_params_vec: Vec<usize> = dynamic_params.clone().into();
+            let dynamic_params_vec: Vec<u32> = dynamic_params.clone().into();
             hash_data.extend(dynamic_params_vec.into_iter().map(Felt::from));
         }
 

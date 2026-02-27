@@ -4,7 +4,7 @@ pub mod global_values;
 use crate::{
     consts::*,
     felt_hex,
-    layout::stark_curve,
+    layout::{compute_program_hash, stark_curve},
     periodic_columns::{eval_ecdsa_x, eval_ecdsa_y, eval_pedersen_x, eval_pedersen_y},
     public_memory::{PublicInput, INITIAL_PC, MAX_ADDRESS, MAX_LOG_N_STEPS, MAX_RANGE_CHECK},
 };
@@ -12,7 +12,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use global_values::{EcPoint, EcdsaSigConfig, GlobalValues, InteractionElements};
 use starknet_core::types::NonZeroFelt;
-use starknet_crypto::{pedersen_hash, Felt};
+use starknet_crypto::Felt;
 use swiftness_commitment::table::{commit::table_commit, decommit::table_decommit};
 use swiftness_transcript::ensure;
 
@@ -83,15 +83,15 @@ pub const BUILTINS: [Felt; 4] =
 pub struct Layout {}
 
 impl StaticLayoutTrait for Layout {
-    const NUM_COLUMNS_FIRST: usize = 23;
-    const NUM_COLUMNS_SECOND: usize = 2;
+    const NUM_COLUMNS_FIRST: u32 = 23;
+    const NUM_COLUMNS_SECOND: u32 = 2;
 }
 
 impl GenericLayoutTrait for Layout {
-    fn get_num_columns_first(_public_input: &PublicInput) -> Option<usize> {
+    fn get_num_columns_first(_public_input: &PublicInput) -> Option<u32> {
         Some(Self::NUM_COLUMNS_FIRST)
     }
-    fn get_num_columns_second(_public_input: &PublicInput) -> Option<usize> {
+    fn get_num_columns_second(_public_input: &PublicInput) -> Option<u32> {
         Some(Self::NUM_COLUMNS_SECOND)
     }
 }
@@ -353,17 +353,15 @@ impl LayoutTrait for Layout {
         Ok(())
     }
 
-    fn verify_public_input(public_input: &PublicInput) -> Result<(Felt, Felt), PublicInputError> {
+    fn verify_public_input(
+        public_input: &PublicInput,
+    ) -> Result<(Felt, Vec<Felt>), PublicInputError> {
         let public_segments = &public_input.segments;
 
         let initial_pc = public_segments
             .get(segments::PROGRAM)
             .ok_or(PublicInputError::SegmentMissing { segment: segments::PROGRAM })?
             .begin_addr;
-        let final_pc = public_segments
-            .get(segments::PROGRAM)
-            .ok_or(PublicInputError::SegmentMissing { segment: segments::PROGRAM })?
-            .stop_ptr;
         let initial_ap = public_segments
             .get(segments::EXECUTION)
             .ok_or(PublicInputError::SegmentMissing { segment: segments::EXECUTION })?
@@ -395,25 +393,13 @@ impl LayoutTrait for Layout {
             .collect::<Vec<Felt>>();
 
         ensure!(initial_pc == INITIAL_PC, PublicInputError::MaxSteps);
-        ensure!(final_pc == INITIAL_PC + FELT_4, PublicInputError::MaxSteps);
 
-        let program_end_pc = initial_fp - FELT_2;
-
-        let program: Vec<&Felt> = memory
-            .iter()
-            .skip(initial_pc.to_bigint().try_into()?)
-            .step_by(2)
-            .take((program_end_pc - FELT_1).to_bigint().try_into()?)
-            .collect();
-
-        let hash = program.iter().fold(FELT_0, |acc, &e| pedersen_hash(&acc, e));
-        let program_hash = pedersen_hash(&hash, &Felt::from(program.len()));
+        let program_hash = compute_program_hash(memory, initial_pc, initial_fp)?;
 
         let output_len: usize = (output_stop - output_start).to_bigint().try_into()?;
-        let output = &memory[memory.len() - output_len * 2..];
-        let hash = output.iter().skip(1).step_by(2).fold(FELT_0, |acc, e| pedersen_hash(&acc, e));
-        let output_hash = pedersen_hash(&hash, &Felt::from(output_len));
+        let output =
+            memory[memory.len() - output_len * 2..].iter().skip(1).step_by(2).cloned().collect();
 
-        Ok((program_hash, output_hash))
+        Ok((program_hash, output))
     }
 }
